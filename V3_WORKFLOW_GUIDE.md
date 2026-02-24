@@ -4,7 +4,7 @@
 
 | Layer | Components |
 |-------|------------|
-| **Orchestration** | Claude Code, Claude Flow V3 (daemon, swarm, MCP, SPARC, browser) |
+| **Orchestration** | Claude Code, Claude Flow V3 (daemon, swarm, MCP, browser) |
 | **Memory** | Claude Flow SQLite memory, AgentDB vector DB (HNSW), sql.js |
 | **Intelligence** | RuVector neural engine, hooks intelligence, neural operations |
 | **Native Skills** | 36 skills: Core (6), AgentDB (4), GitHub (4), V3 Dev (9), ReasoningBank (2), Flow Nexus (3), Additional (8) |
@@ -14,6 +14,19 @@
 | **Ecosystem** | OpenSpec (API design), RuVector RUVLLM, RuV Helpers 3D Visualization |
 | **Monitoring** | Statusline Pro (15 components), ccusage (on-demand) |
 | **Collaboration** | Codex integration, AGENTS.md protocol |
+
+---
+
+## Core Philosophy: ADR + DDD First
+
+Turbo Flow v3.4.0 is built around **Architecture Decision Records (ADR)** and **Domain-Driven Design (DDD)** as the primary development methodology. This approach ensures:
+
+- **Architecture decisions are documented and traceable** via ADRs
+- **Code organization reflects business domains** via DDD bounded contexts
+- **Ubiquitous language emerges from domain modeling**
+- **Strategic design guides tactical implementation**
+
+Spec-driven approaches (OpenSpec, SPARC) remain available as secondary tools for specific use cases.
 
 ---
 
@@ -166,14 +179,90 @@ You have three distinct memory layers. They serve different purposes.
 
 ---
 
+## ADR + DDD Methodology
+
+### Architecture Decision Records (ADR)
+
+ADRs capture important architectural decisions along with their context and consequences.
+
+**ADR Structure:**
+```
+docs/adr/
+├── ADR-001-record-architecture-decisions.md
+├── ADR-002-choose-database-technology.md
+├── ADR-003-adopt-microservices.md
+└── ...
+```
+
+**Creating an ADR:**
+
+> "Create an ADR for adopting PostgreSQL as our primary database. Include context, decision, consequences, and alternatives considered"
+
+> "Document the decision to use event-driven architecture in ADR format"
+
+**Key ADR Commands:**
+
+> "List all ADRs and their status"
+
+> "Review ADR-003 and suggest updates based on new requirements"
+
+> "Create an ADR index with decision timeline"
+
+### Domain-Driven Design (DDD)
+
+DDD organizes code around business domains with clear bounded contexts.
+
+**DDD Structure:**
+```
+src/
+├── domains/
+│   ├── identity/           # User management bounded context
+│   │   ├── application/    # Use cases, handlers
+│   │   ├── domain/         # Entities, value objects, aggregates
+│   │   ├── infrastructure/ # Repositories, external services
+│   │   └── interfaces/     # Controllers, DTOs
+│   ├── ordering/           # Order management bounded context
+│   ├── inventory/          # Inventory bounded context
+│   └── shared/             # Shared kernel
+```
+
+**Applying DDD:**
+
+> "Use v3-ddd-architecture to analyze this codebase and identify bounded contexts"
+
+> "Design aggregates and entities for the Order domain"
+
+> "Create a context map showing relationships between bounded contexts"
+
+> "Define ubiquitous language for the Payment domain"
+
+**Key DDD Skills:**
+
+| Skill | Command | Purpose |
+|-------|---------|---------|
+| `v3-ddd-architecture` | `cf-v3-ddd` | Bounded contexts, microkernel design |
+| `v3-core-implementation` | `cf-v3-core` | DDD domains, clean architecture |
+| `reasoningbank-intelligence` | — | Pattern recognition across domains |
+
+### ADR + DDD Workflow
+
+1. **Discover Domains** → Identify bounded contexts from business requirements
+2. **Document Decisions** → Create ADRs for architectural choices
+3. **Model Aggregates** → Define entities, value objects, aggregate roots
+4. **Define Interfaces** → Establish contracts between contexts
+5. **Implement** → Build domain logic with application services
+6. **Validate** → Verify against ADR constraints and domain invariants
+
+---
+
 ## Native Skills (36 Total)
 
 ### Core Skills (6)
 
 | Skill | Command | Purpose |
 |-------|---------|---------|
-| `sparc-methodology` | `cf-sparc` | SPARC development methodology |
-| `swarm-orchestration` | `cf-swarm-skill` | Multi-agent coordination (mesh/hierarchical) |
+| `sparc-methodology` | `cf-sparc` | SPARC methodology (secondary) |
+| `swarm-orchestration` | `cf-swarm-skill` | Multi-agent coordination |
 | `github-code-review` | `cf-gh-review` | AI-powered PR reviews |
 | `agentdb-vector-search` | `cf-agentdb-search` | HNSW vector search (150x faster) |
 | `pair-programming` | `cf-pair` | Driver/Navigator AI coding |
@@ -197,13 +286,13 @@ You have three distinct memory layers. They serve different purposes.
 | `github-release-management` | `cf-gh-release` | Versioning, deployment, rollback |
 | `github-workflow-automation` | `cf-gh-workflow` | CI/CD pipeline automation |
 
-### V3 Development Skills (9)
+### V3 Development Skills (9) — PRIMARY
 
 | Skill | Command | Purpose |
 |-------|---------|---------|
 | `v3-cli-modernization` | `cf-v3-cli` | Interactive prompts, command decomposition |
-| `v3-core-implementation` | `cf-v3-core` | DDD domains, clean architecture |
-| `v3-ddd-architecture` | `cf-v3-ddd` | Bounded contexts, microkernel |
+| `v3-core-implementation` | `cf-v3-core` | **DDD domains, clean architecture** |
+| `v3-ddd-architecture` | `cf-v3-ddd` | **Bounded contexts, microkernel** |
 | `v3-integration-deep` | — | Deep agentic-flow integration |
 | `v3-mcp-optimization` | — | Sub-100ms MCP response |
 | `v3-memory-unification` | — | Unified AgentDB backend |
@@ -241,9 +330,7 @@ You have three distinct memory layers. They serve different purposes.
 
 ---
 
-## Plugins (15 Total) ⭐ NEW
-
-Plugins extend Claude Flow with domain-specific capabilities and advanced AI features.
+## Plugins (15 Total)
 
 ### Quality Engineering Plugins (2)
 
@@ -295,23 +382,11 @@ Plugins extend Claude Flow with domain-specific capabilities and advanced AI fea
 | `gastown-bridge` | — | WASM bridge for high-performance computing |
 | `teammate-plugin` | — | Team collaboration, role assignment |
 
-### Plugin Usage Examples
-
-> "Use plugin-qe to generate comprehensive tests for this module"
-
-> "Run plugin-cognitive to analyze the meta-reasoning behind this architecture decision"
-
-> "Apply plugin-perf to profile this bottleneck and suggest optimizations"
-
-> "Use plugin-financial to model the risk assessment for this trading algorithm"
-
-> "Run plugin-legal to review this contract for potential issues"
-
 ---
 
-## Workflow 1: New Builds
+## Workflow 1: New Builds (ADR + DDD)
 
-*Greenfield project from PRD to deployment.*
+*Greenfield project from requirements to deployment.*
 
 ### 1. Boot (do this once per session)
 
@@ -319,69 +394,71 @@ Follow the Boot Sequence above, or if already booted:
 
 > "Check system status and make sure daemon is running and MCP servers are connected"
 
-### 2. Spec & Plan
+### 2. Domain Discovery
 
-> "Run /prd2build against this PRD and break it into architecture decisions, bounded contexts, and an ordered task list"
+> "Analyze these business requirements and identify potential bounded contexts"
 
-> "Use OpenSpec to define the REST API contract before we write any code"
+> "Use v3-ddd-architecture to discover domains and define bounded context boundaries"
 
-> "Store the project architecture decisions in memory so agents can reference them throughout the build"
+> "Create a context map showing relationships and integration patterns between contexts"
 
-> "Use SPARC methodology to plan this feature systematically" *(triggers sparc-methodology skill)*
+> "Define the ubiquitous language for each bounded context"
 
-### 3. Design
+### 3. Architecture Decision Records
 
-> "Spawn a hierarchical swarm with a system architect, task planner, and tech researcher to design the architecture"
+> "Create ADR-001 documenting our decision to use microservices architecture with event-driven communication"
 
-> "Design a modern dashboard interface for this application" *(auto-triggers UI UX Pro Max — 57 styles, 95 palettes, 56 font pairings)*
+> "Document the technology stack decisions with context, alternatives, and consequences"
 
-> "Search the design database for a color palette and typography that fits a SaaS fintech product"
+> "Store all ADRs in memory for future reference"
 
-> "Generate a persistent design system so every page stays visually consistent"
+```bash
+mem-store "project/adrs" "$(ls docs/adr/)"
+```
 
-> "Use plugin-cognitive for meta-cognitive analysis of our design decisions" ⭐
+### 4. Domain Modeling
 
-### 4. Build
+> "Design aggregates, entities, and value objects for the Identity bounded context"
 
-> "Create a development swarm with 3 coders, 2 testers, and a reviewer using hierarchical topology"
+> "Define domain events and their handlers for the Order context"
 
-> "Orchestrate building the user authentication system with adaptive task routing"
+> "Create repository interfaces following DDD patterns"
 
-> "Route the database schema task to the agent best suited based on learned patterns"
+> "Use plugin-code-intel to validate domain model consistency"
 
-> "Remember this OAuth implementation as a reusable pattern for future projects"
+### 5. Build
 
-> "Apply v3-ddd-architecture to structure the bounded contexts correctly" ⭐
+> "Spawn a hierarchical swarm with a system architect, domain experts, and implementers"
 
-### 5. Test & Secure
+> "Orchestrate building the Identity context using v3-core-implementation patterns"
 
-> "Generate comprehensive tests for src/services/ targeting 95% coverage"
+> "Route the aggregate design task to agents with DDD experience"
 
-> "Run plugin-qe for autonomous test generation and quality engineering" ⭐
+> "Remember this domain model pattern for similar contexts"
 
-> "Run the full quality pipeline: test generation, coverage analysis, security scan, and quality gate at 90% threshold"
+### 6. Test & Secure
 
-> "Scan the codebase for security vulnerabilities and OWASP compliance" *(auto-triggers Security Analyzer)*
+> "Generate comprehensive tests for the Order domain targeting 95% coverage"
 
-> "Use v3-security-overhaul to audit and remediate CVEs" ⭐
+> "Run plugin-qe for autonomous quality engineering"
 
-> "Use the Claude Flow browser to open localhost:3000, take a snapshot, fill in the login form with test credentials, and verify it works"
+> "Run the full quality pipeline: test generation, coverage analysis, security scan"
 
-### 6. Deploy
+> "Use v3-security-overhaul to audit and remediate CVEs"
 
-> "Deploy this to Vercel and give me the preview URL" *(triggers Vercel Deploy skill)*
+### 7. Deploy
 
-> "Use github-release-management to prepare the release" ⭐
+> "Deploy this to Vercel and give me the preview URL"
 
-> "Generate API documentation for the project"
+> "Use github-release-management to prepare the release"
 
-### 7. Learn & Save
+### 8. Document & Learn
 
-> "Consolidate everything RuVector learned during this build session"
+> "Update the context map with actual integration patterns implemented"
 
-> "Store the full project architecture in AgentDB for semantic search in future sessions"
+> "Create ADR for any architectural decisions made during implementation"
 
-> "Show me what patterns were captured and learning statistics"
+> "Consolidate everything RuVector learned during this build"
 
 ```bash
 ruv-learn
@@ -391,127 +468,119 @@ mem-stats
 
 ---
 
-## Workflow 2: Continued Builds
+## Workflow 2: Continued Builds (Domain Extension)
 
-*Adding features to an existing project.*
+*Adding new bounded contexts or extending existing ones.*
 
 ### 1. Recover Context
 
-> "Recall what RuVector knows about this project from previous sessions"
+> "Recall what RuVector knows about this project's domain model"
 
-> "Search AgentDB for the architecture decisions we stored last time"
+> "Search AgentDB for ADRs and context maps from previous sessions"
 
-> "What patterns have been learned for this codebase? Show me the statistics"
+> "Show me the current bounded context structure"
 
 ```bash
 cf-doctor
-ruv-recall "project-name"
-ruv-stats
+ruv-recall "domain-model"
+mem-search "adr"
 ```
 
-### 2. Plan the Feature
+### 2. Analyze Impact
 
-> "Analyze the impact of adding payment processing — what modules are affected, what might break?"
+> "Analyze the impact of adding a Payment bounded context — what existing contexts are affected?"
 
-> "Spawn a tactical hive-mind to evaluate Stripe vs PayPal integration and reach consensus"
+> "Use v3-ddd-architecture to identify integration points"
 
-> "Use OpenSpec to extend the API contract with payment endpoints"
+> "Check ADRs for any constraints on new contexts"
 
-> "Route this feature to the right workflow based on learned patterns"
+> "Use plugin-cognitive for meta-analysis of architectural fit"
 
-> "Use plugin-hyperbolic for complex multi-dimensional reasoning about this decision" ⭐
+### 3. Design the Extension
 
-### 3. Build
+> "Design the Payment bounded context with aggregates, entities, and domain events"
 
-> "Create a feature swarm with 2 backend devs, 1 frontend dev, and a tester for Stripe integration"
+> "Define integration events for communicating with Order context"
 
-> "Orchestrate the payment processing implementation using a fork-join task pattern"
+> "Create ADR documenting the Payment context design decisions"
 
-> "Store the integration approach in memory so the swarm agents stay aligned"
+> "Update the context map with new relationships"
 
-> "Apply reasoningbank-intelligence to learn from previous similar implementations" ⭐
+### 4. Build
 
-### 4. Test
+> "Create a feature swarm with 2 backend devs, 1 domain expert, and a tester"
 
-> "Run incremental tests scoped to src/services/payment/"
+> "Implement the Payment context following v3-core-implementation patterns"
 
-> "Use plugin-test-intel for smart test selection and coverage optimization" ⭐
+> "Use agentdb-learning to train on existing context implementations"
 
-> "Use the Claude Flow browser to walk through the checkout flow — open the page, fill card details, submit, and verify success"
+### 5. Test
 
-> "Start a trajectory recording on the checkout flow and save it as a reusable test pattern"
+> "Run plugin-test-intel for smart test selection across contexts"
 
-> "Run the quality gate at 95% threshold with a merge recommendation"
+> "Validate domain invariants in the Payment aggregate"
 
-### 5. Secure & Ship
+> "Run the quality gate at 95% threshold"
 
-> "Audit the payment implementation for PCI compliance" *(triggers Security Analyzer)*
+### 6. Integrate & Deploy
 
-> "Use plugin-financial to model financial risk for this implementation" ⭐
+> "Implement integration events between Payment and Order contexts"
 
-> "Deploy the preview to Vercel so stakeholders can review"
-
-> "Remember the Stripe integration pattern and payment form validation approach"
+> "Deploy the preview and verify cross-context communication"
 
 ---
 
-## Workflow 3: Refactor Builds
+## Workflow 3: Refactor Builds (Architecture Evolution)
 
-*Improving code quality without changing behavior.*
+*Evolving architecture while preserving domain logic.*
 
 ### 1. Baseline
 
-> "Recall any refactor patterns RuVector has stored from previous sessions"
+> "Recall all ADRs and the current domain model"
 
-> "Generate characterization tests that capture current behavior before we change anything"
+> "Generate characterization tests that capture current behavior"
 
-> "Spawn a mesh analysis swarm to review the entire codebase — complexity, dead code, performance hotspots, dependency issues"
+> "Use plugin-code-intel for AST analysis of current structure"
 
-> "Run a comprehensive security audit: CVEs, insecure dependencies, hardcoded credentials, OWASP Top 10"
+> "Spawn a mesh analysis swarm to review domain boundaries and code organization"
 
-> "Use plugin-code-intel for AST analysis and code understanding" ⭐
+### 2. Plan the Evolution
 
-### 2. Plan
+> "Create ADR for migrating from monolith to modular monolith with DDD"
 
-> "Create architecture decision records for migrating to TypeScript strict mode and modernizing the API layer"
+> "Analyze current code against DDD patterns — identify violations and improvements"
 
-> "Plan the refactoring sequence based on dependency chains, risk levels, and available test coverage"
+> "Use v3-ddd-architecture to plan bounded context extraction"
 
-> "Store the refactor plan in memory so all swarm agents reference the same priorities"
+> "Store the evolution plan in memory"
 
-> "Apply v3-ddd-architecture principles to the refactoring plan" ⭐
+### 3. Execute Refactoring
 
-### 3. Refactor
+> "Use v3-core-implementation patterns to refactor the User module into Identity context"
 
-> "Use SPARC test-driven development to refactor the user service to a repository pattern"
+> "Extract domain logic from infrastructure following DDD patterns"
 
-> "Spin up a mesh swarm with 4 coders and 2 reviewers for parallel refactoring"
+> "Maintain ADR traceability during refactoring"
 
-> "Route the class-to-hooks migration to agents with React experience"
-
-> "Modernize these legacy components with accessibility, dark mode, and proper design patterns" *(triggers UI UX Pro Max)*
-
-> "Use plugin-perf to identify and optimize performance bottlenecks" ⭐
-
-> "Apply plugin-quantum for optimization of the refactoring sequence" ⭐
+> "Use verification-quality for truth scoring and rollback protection"
 
 ### 4. Validate
 
-> "Run the characterization tests against the baseline to detect any behavioral changes"
+> "Run characterization tests against refactored code"
 
-> "Use the Claude Flow browser to snapshot every major page before and after for visual regression"
+> "Verify domain invariants are preserved"
 
-> "Compare performance benchmarks — page load, bundle size, memory usage — against the pre-refactor baseline"
+> "Use plugin-perf to compare performance before and after"
 
-> "Run the final quality gate: full regression, security compliance, performance comparison, 90%+ coverage"
+> "Run the final quality gate"
 
-> "Use verification-quality skill for truth scoring and automatic rollback if needed" ⭐
+### 5. Document
 
-### 5. Learn
+> "Update all ADRs affected by the refactoring"
 
-> "Remember the TypeScript strict migration pattern, the component modernization approach, and the repository pattern for future refactors"
+> "Update context map with new boundaries"
 
-> "Consolidate all learnings from this refactor session"
+> "Record lessons learned in RuVector"
 
 ```bash
 ruv-learn
@@ -522,179 +591,152 @@ ruv-stats
 
 ## Workflow 4: UI Development
 
-*Frontend work leveraging the design intelligence database.*
+*Frontend work with domain-aware components.*
 
-UI UX Pro Max activates automatically when your prompt mentions design, UI, dashboard, components, styling, or similar terms. It searches 57 styles, 95 color palettes, 56 font pairings, 98 UX guidelines, and 24 chart types — then feeds Claude the relevant design context before generating code.
+### 1. Understand Domain Context
 
-### Design
+> "What bounded context does this UI component serve?"
 
-> "Design a SaaS dashboard with a professional color palette, typography, and responsive layout"
+> "Map UI screens to domain operations and aggregates"
 
-> "What UI style works best for a healthcare app? Give me the full design system"
+> "Ensure ubiquitous language consistency in UI labels"
 
-> "Search the design database for glassmorphism with dark mode"
+### 2. Design
 
-> "Generate a persistent design system for this project with master rules and per-page overrides"
+> "Design a dashboard interface for the Order bounded context"
 
-### Build
+> "Search the design database for styles matching our domain model"
 
-> "Build a data table component with sorting, filtering, and pagination following our design system"
+> "Generate a persistent design system aligned with domain terminology"
 
-> "Create a responsive navigation with mobile hamburger, following the UX accessibility guidelines"
+### 3. Build
 
-> "Implement smooth page transitions and micro-interactions"
+> "Create components that reflect domain concepts"
 
-### Test
+> "Implement UI following our design system and DDD patterns"
 
-> "Use the Claude Flow browser to snapshot every major page at desktop and mobile viewports"
+> "Use pair-programming for complex UI logic"
 
-> "Start a trajectory recording, walk through the entire signup flow, and save it for regression testing"
+### 4. Test
 
-> "Audit the frontend for WCAG 2.1 AA compliance and fix any violations"
+> "Use the Claude Flow browser to validate UI against domain requirements"
 
-### Deploy
+> "Start trajectory recording for user flows"
 
-> "Deploy to Vercel and run a visual check on the deployed preview"
+> "Verify accessibility compliance"
 
 ---
 
-## Workflow 5: Domain-Specific Development ⭐ NEW
+## Workflow 5: Domain-Specific Development
 
-*Leveraging specialized plugins for industry-specific workloads.*
+*Leveraging specialized plugins for industry workloads.*
 
 ### Financial Applications
 
-> "Use plugin-financial to model risk assessment for this trading algorithm"
+> "Use plugin-financial to model risk for the Trading bounded context"
 
-> "Analyze portfolio variance and suggest hedging strategies"
+> "Create ADR for regulatory compliance architecture"
 
-> "Run Monte Carlo simulations on the investment model"
+> "Design domain events for trade lifecycle"
 
 ### Healthcare Applications
 
-> "Use plugin-healthcare to validate clinical workflow compliance"
+> "Use plugin-healthcare for Patient context domain modeling"
 
-> "Map medical terminology to standard ontologies (SNOMED, ICD-10)"
+> "Ensure HIPAA compliance in ADR documentation"
 
-> "Audit HIPAA compliance for patient data handling"
+> "Design bounded contexts around clinical workflows"
 
 ### Legal Document Processing
 
-> "Use plugin-legal to analyze this contract for potential issues"
+> "Use plugin-legal to analyze contract domain requirements"
 
-> "Extract key clauses and compare against standard templates"
+> "Create ADR for document storage architecture"
 
-> "Generate compliance checklist from regulatory requirements"
+> "Model Contract aggregate with versioning"
+
+---
+
+## Secondary: Spec-Driven Workflows
+
+OpenSpec and SPARC remain available for specific use cases.
+
+### When to Use Spec-Driven
+
+| Use Case | Tool | Purpose |
+|----------|------|---------|
+| API contract definition | OpenSpec | Define REST API contracts |
+| Formal methodology needed | SPARC | Systematic development phases |
+| External integration specs | OpenSpec | Third-party API documentation |
+
+### OpenSpec (Secondary)
+
+> "Use OpenSpec to define the REST API contract for the Order context"
+
+> "Validate the API spec against domain model"
+
+### SPARC Methodology (Secondary)
+
+> "Use SPARC methodology for systematic feature development"
+
+> "Apply SPARC phases: Specification, Pseudocode, Architecture, Refinement, Completion"
 
 ---
 
 ## Tool Reference
 
+### DDD + ADR Commands (Primary)
+
+| Command | Purpose |
+|---------|---------|
+| `cf-v3-ddd` | DDD architecture, bounded contexts |
+| `cf-v3-core` | Clean architecture implementation |
+| `cf-v3-cli` | Interactive domain modeling |
+| `mem-store` | Store ADRs and context maps |
+
 ### Swarm Topologies
 
 | Topology | Command | When to use |
 |----------|---------|-------------|
-| Hierarchical | `cf-swarm` | Feature builds — lead delegates to specialists |
+| Hierarchical | `cf-swarm` | Domain implementation — architect delegates to specialists |
 | Mesh | `cf-mesh` | Refactoring — parallel peer-to-peer work |
-| Byzantine | via NLP | Research — consensus when agents disagree |
-| Star | via NLP | Full app builds — central coordinator |
-| Single agent | `dsp` | Quick fixes — no orchestration overhead |
-
-> "Spawn a hierarchical swarm with 3 coders and 2 testers"
-
-> "Create a mesh swarm for parallel refactoring across 4 modules"
-
-> "Use byzantine consensus to evaluate three competing architecture approaches"
+| Byzantine | via NLP | Architecture decisions — consensus on ADRs |
+| Star | via NLP | Full context builds — central coordinator |
 
 ### Claude Flow Browser (59 MCP Tools)
-
-Browser automation without Chromium — runs through Claude Flow's MCP.
 
 | Command | What it does |
 |---------|-------------|
 | `cfb-open <url>` | Open a page |
 | `cfb-snap` | Take a snapshot |
-| `cfb-click <ref>` | Click element (@e1, @e2...) |
+| `cfb-click <ref>` | Click element |
 | `cfb-fill <ref> <val>` | Fill an input |
 | `cfb-trajectory` | Start recording a user flow |
-| `cfb-learn` | Save the recording to RuVector |
-
-> "Open localhost:3000, snapshot the homepage, then fill the search box and click submit"
-
-> "Record a trajectory of the entire onboarding flow and save it as a regression test"
+| `cfb-learn` | Save the recording |
 
 ### Memory Operations
 
-**Claude Flow Memory** (SQLite, built-in):
+**Claude Flow Memory:**
 
 | Command | What it does |
 |---------|-------------|
-| `mem-store "key" "value"` | Store a key-value pair |
+| `mem-store "key" "value"` | Store ADRs, context maps |
 | `mem-search "query"` | Keyword search |
-| `mem-vsearch "query"` | Semantic vector search |
+| `mem-vsearch "query"` | Semantic search |
 | `mem-stats` | Database statistics |
-| `mem-hnsw` | Build/rebuild HNSW index |
 
-**RuVector** (Neural learning):
+**RuVector:**
 
 | Command | What it does |
 |---------|-------------|
 | `ruv-init` | Activate hooks |
-| `ruv-remember "name"` | Save a successful pattern |
-| `ruv-recall "query"` | Retrieve matching patterns |
-| `ruv-route "task"` | Route task to best agent |
-| `ruv-learn` | Consolidate session learnings |
+| `ruv-remember "pattern"` | Save domain patterns |
+| `ruv-recall "query"` | Retrieve patterns |
+| `ruv-route "task"` | Route to best agent |
+| `ruv-learn` | Consolidate learnings |
 | `ruv-stats` | Learning statistics |
 
-**AgentDB** (HNSW vector DB, separate MCP):
-
-| Command | What it does |
-|---------|-------------|
-| `agentdb-init` | Initialize database |
-| `agentdb-mcp` | Start as MCP server |
-| `agentdb-stats` | Database statistics |
-
-Once AgentDB is registered as MCP, Claude Code gains these tools: `agentdb_query` (semantic search), `agentdb_store` (store with embeddings), `agentdb_stats`.
-
-### Hooks Intelligence
-
-| Command | What it does |
-|---------|-------------|
-| `hooks-train` | Pretrain from codebase |
-| `hooks-pre "file"` | Look up patterns before editing |
-| `hooks-post "file"` | Learn patterns after editing |
-| `hooks-intel` | Intelligence status |
-| `hooks-route "task"` | Route to best agent |
-
-> "Pretrain hooks intelligence from the codebase so it knows our patterns"
-
-> "What does hooks intelligence recommend for this database migration?"
-
-### Neural Operations
-
-| Command | What it does |
-|---------|-------------|
-| `neural-train` | Train on accumulated patterns |
-| `neural-status` | Engine status |
-| `neural-patterns` | View learned patterns |
-| `neural-predict "input"` | Predict from patterns |
-
-> "Train the neural engine on everything we've done today, then show me the learned patterns"
-
-### Testing & Quality
-
-| Command | What it does |
-|---------|-------------|
-| `aqe-generate` | Generate tests |
-| `aqe-gate` | Run quality gate |
-| `plugin-qe` | Autonomous quality engineering ⭐ |
-| `plugin-test-intel` | Smart test selection ⭐ |
-
-> "Generate tests for the auth module with 95% coverage target"
-
-> "Run the quality gate — coverage, security, performance — and tell me if it's safe to merge"
-
-### Plugin Quick Reference ⭐
+### Plugin Quick Reference
 
 | Category | Commands |
 |----------|----------|
@@ -705,86 +747,14 @@ Once AgentDB is registered as MCP, Claude Code gains these tools: `agentdb_query
 | **Neural** | `plugin-neural` |
 | **Domain** | `plugin-financial`, `plugin-healthcare`, `plugin-legal` |
 
-### OpenSpec (API Design)
+### Security & Deployment
 
 | Command | What it does |
 |---------|-------------|
-| `os "command"` | Run OpenSpec |
-| `os-init` | Initialize spec structure |
-
-> "Initialize OpenSpec and define the REST API contract for the user service"
-
-> "Validate the API spec and show any violations"
-
-### Security Analyzer
-
-Activates automatically on security-related prompts.
-
-> "Scan for vulnerabilities and check dependencies for CVEs"
-
-> "Audit API endpoints against OWASP Top 10"
-
-> "Review authentication flows for security weaknesses"
-
-### Worktree Manager
-
-| Command | What it does |
-|---------|-------------|
-| `wt-create` | Create a new worktree branch |
-| `wt-status` | Check all worktrees |
-| `wt-clean` | Remove merged worktrees |
-
-> "Create a worktree for the payment-feature branch"
-
-> "Clean up worktrees for branches that have been merged"
-
-### Deployment
-
-| Command | What it does |
-|---------|-------------|
+| `cf-v3-security` | Security overhaul, CVE remediation |
 | `deploy` | Deploy to Vercel |
-| `deploy-preview` | Deploy and return preview URL |
-
-> "Deploy to Vercel and give me the preview URL"
-
-### Visualization
-
-```bash
-ruv-viz          # Start 3D dashboard at localhost:3333
-ruv-viz-stop     # Stop the server
-```
-
-> "Start the RuVector 3D visualization so I can see pattern clusters and agent routing"
-
-### Codex Collaboration
-
-Turbo Flow configures Claude Code and Codex for split responsibilities via AGENTS.md:
-
-| Task | Codex | Claude Code |
-|------|-------|-------------|
-| Code changes, tests, refactors | ✅ | |
-| PRs, secrets, multi-repo coordination | | ✅ |
-
-```bash
-codex-login       # Authenticate
-codex-run         # Run with Claude provider
-```
-
-### Monitoring
-
-**Statusline Pro** displays automatically in your terminal:
-
-```
-LINE 1: 📁 Project │ 🤖 Model │ 🌿 Branch │ 📟 Version │ 🎨 Style │ 🔗 Session
-LINE 2: 📊 Tokens │ 🧠 Context │ 💾 Cache │ 💰 Cost │ 🔥 Burn Rate │ ⏱️ Duration
-LINE 3: ➕ Added │ ➖ Removed │ 📂 Git │ 🌳 Worktree │ 🔌 MCP │ ✅ Status
-```
-
-```bash
-turbo-status      # Full component check
-cf-doctor         # Claude Flow diagnostics
-npx -y ccusage    # On-demand cost analysis
-```
+| `deploy-preview` | Deploy with preview URL |
+| `cf-gh-release` | Release management |
 
 ---
 
@@ -794,35 +764,41 @@ npx -y ccusage    # On-demand cost analysis
 |---------|-----|
 | Commands not found | `source ~/.bashrc` |
 | MCP servers not connected | `claude mcp list` — re-register any missing |
-| Memory empty after restart | `npx -y claude-flow@alpha memory init` again |
+| Memory empty after restart | `npx -y claude-flow@alpha memory init` |
 | RuVector not learning | `ruv-init` then `hooks-train` |
-| AgentDB not responding | `claude mcp add agentdb -- npx -y agentdb mcp` |
-| Swarm stuck | `npx -y claude-flow@alpha swarm status` |
-| Slow first tool run | Normal — npx downloads on first use, cached after |
-| Skill not activating | `ls ~/.claude/skills/` — needs SKILL.md present |
-| Plugin not found | `ls .claude-flow/plugins/` — check installation |
-| Daemon died | `cf-daemon` to restart |
+| ADRs not found in memory | `mem-search "adr"` to verify storage |
+| Domain model inconsistent | Use `plugin-code-intel` for analysis |
+| Plugin not found | `ls .claude-flow/plugins/` |
 
 ---
 
 ## Quick Reference
 
 ```
-BOOT:     cf-init → memory init → mcp add → ruv-init → hooks-train → cf-daemon
-PLAN:     /prd2build → os-init → cf-sparc → cf-swarm
-BUILD:    ruv-route → swarm orchestrate → cf-v3-ddd → ruv-remember
-TEST:     plugin-qe → aqe-generate → aqe-gate → cfb-open → cfb-snap
-SECURE:   "scan for vulnerabilities" (auto-triggers) → cf-v3-security
-UI:       "design a dashboard" (auto-triggers UI Pro Max)
-COGNITIVE: plugin-cognitive → plugin-hyperbolic ⭐
-PERF:     plugin-perf → plugin-quantum → plugin-prime ⭐
-DOMAIN:   plugin-financial → plugin-healthcare → plugin-legal ⭐
-MEMORY:   mem-store → mem-search → mem-vsearch → mem-hnsw
-LEARN:    ruv-remember → ruv-learn → ruv-stats
-NEURAL:   neural-train → neural-patterns → neural-predict
-DEPLOY:   deploy-preview → cf-gh-release
-MONITOR:  turbo-status → cf-doctor → ccusage
+BOOT:       cf-init → memory init → mcp add → ruv-init → hooks-train → cf-daemon
+DISCOVER:   v3-ddd-architecture → identify bounded contexts → context map
+DECIDE:     create ADRs → store in memory → validate constraints
+MODEL:      aggregates → entities → value objects → domain events
+BUILD:      v3-core-implementation → swarm orchestrate → ruv-remember
+TEST:       plugin-qe → plugin-test-intel → aqe-gate → verification-quality
+SECURE:     v3-security-overhaul → scan vulnerabilities → remediate CVEs
+DEPLOY:     deploy-preview → cf-gh-release → update context map
+LEARN:      ruv-remember → ruv-learn → update ADRs if needed
+MONITOR:    turbo-status → cf-doctor → ccusage
 ```
+
+---
+
+## Methodology Summary
+
+| Primary | Secondary |
+|---------|-----------|
+| **ADR** - Architecture Decision Records | SPARC - Formal methodology |
+| **DDD** - Domain-Driven Design | OpenSpec - API specifications |
+| **Bounded Contexts** | Monolithic patterns |
+| **Ubiquitous Language** | Technical terminology |
+| **Domain Events** | Direct method calls |
+| **Aggregates** | Anemic models |
 
 ---
 
@@ -830,13 +806,11 @@ MONITOR:  turbo-status → cf-doctor → ccusage
 
 | Category | Count | Key Commands |
 |----------|-------|--------------|
-| Core Skills | 6 | `cf-sparc`, `cf-swarm-skill`, `cf-hive`, `cf-pair` |
-| AgentDB Skills | 4 | `cf-agentdb-advanced`, `cf-agentdb-learning` |
+| DDD Skills | 9 | `cf-v3-ddd`, `cf-v3-core`, `cf-v3-cli` |
+| Core Skills | 6 | `cf-swarm-skill`, `cf-hive`, `cf-pair` |
+| AgentDB Skills | 4 | `cf-agentdb-learning`, `cf-agentdb-memory` |
 | GitHub Skills | 4 | `cf-gh-review`, `cf-gh-multi`, `cf-gh-project` |
-| V3 Dev Skills | 9 | `cf-v3-cli`, `cf-v3-core`, `cf-v3-ddd`, `cf-v3-perf` |
-| ReasoningBank | 2 | `reasoningbank-agentdb`, `reasoningbank-intelligence` |
-| Flow Nexus | 3 | `flow-nexus-neural`, `flow-nexus-platform` |
-| Additional | 8 | `hooks-automation`, `verification-quality` |
-| Custom Skills | 5 | Security Analyzer, UI Pro Max, Worktree Manager |
-| **Plugins** | **15** | `plugin-qe`, `plugin-cognitive`, `plugin-perf`, etc. |
+| Additional | 8 | `verification-quality`, `hooks-automation` |
+| Custom Skills | 5 | Security Analyzer, UI Pro Max, Worktree |
+| **Plugins** | **15** | `plugin-qe`, `plugin-cognitive`, `plugin-financial` |
 | **Total** | **56** | Complete agentic development environment |
