@@ -269,15 +269,10 @@ else
         status "Initializing Claude Flow in workspace"
         npx -y claude-flow@alpha init --force 2>/dev/null || true
     fi
-    
-    status "Installing sql.js for memory database (local devDep)"
-    if [ -f "package.json" ]; then
-        npm install sql.js --save-dev --silent 2>/dev/null || true
-    fi
-    
+
     status "Warming RuVector npx cache"
     npx -y ruvector --version 2>/dev/null || true
-    
+
     ok "Claude Flow + RuVector installed"
 
     npm cache clean --force 2>/dev/null || true
@@ -730,6 +725,12 @@ cd "$WORKSPACE_FOLDER" 2>/dev/null || true
 
 [ ! -f "package.json" ] && npm init -y --silent 2>/dev/null
 npm pkg set type="module" 2>/dev/null || true
+
+# Install sql.js for memory database (after package.json exists)
+if ! npm list sql.js --depth=0 >/dev/null 2>&1; then
+    status "Installing sql.js for memory database"
+    npm install sql.js --save-dev 2>/dev/null || warn "sql.js install failed (memory may use fallback)"
+fi
 
 for dir in src tests docs scripts config plans; do
     mkdir -p "$dir" 2>/dev/null
