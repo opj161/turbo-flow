@@ -8,11 +8,12 @@ Validated against: Anthropic's 2026 Agentic Coding Trends Report, PACT framework
 
 ## How This Works
 
-The core loop is 3 phases:
+The core loop is 4 phases:
 
-1. **Plan** — ADR/DDD from research, using Ruflo's self-learning, hooks, security, and optimizations. Swarm plans but does NOT implement.
-2. **Customize** — Update CLAUDE.md and statusline to match the DDD you just outlined. This is how agents know your project.
-3. **Execute** — Swarm implements completely: code, test, validate, benchmark, optimize, document. Continue until done.
+1. **PRD** — Generate a Product Requirements Document from your idea or research. Save to `plans/research/PLAN.md`. This is the input that drives everything.
+2. **Plan** — ADR/DDD from the PRD, using Ruflo's self-learning, hooks, security, and optimizations. Swarm plans but does NOT implement.
+3. **Customize** — Update CLAUDE.md and statusline to match the DDD you just outlined. This is how agents know your project.
+4. **Execute** — Swarm implements completely: code, test, validate, benchmark, optimize, document. Continue until done.
 
 **After every phase and every ADR completion**, the Agentic QE plugin runs the complete QE agent pipeline (`aqe-generate` → `aqe-gate`) to verify the output and identify gaps before proceeding. No phase is considered complete until QE passes.
 
@@ -51,11 +52,80 @@ hooks-train           # Pretrain Ruflo on this codebase
 
 ---
 
+## Phase 0.5: Generate the PRD
+
+Before any planning happens, you need a Product Requirements Document. This is the input that drives everything — without it, the ADR/DDD planning prompt has nothing to work from. The PRD gets saved as `plans/research/PLAN.md`.
+
+### 0.5.1 — PRD from a Business Idea
+
+> I want to build [describe the product/feature/system]. Generate a comprehensive Product Requirements Document (PRD) covering:
+>
+> **Product Overview:**
+> - Problem statement — what pain does this solve?
+> - Target users — who is this for?
+> - Success criteria — how do we know it works?
+>
+> **Functional Requirements:**
+> - Core features (P0 — must have)
+> - Secondary features (P1 — should have)
+> - Nice-to-have features (P2 — could have)
+> - For each feature: user story, acceptance criteria, edge cases
+>
+> **Non-Functional Requirements:**
+> - Performance targets (response times, throughput)
+> - Security requirements (auth, data protection, compliance)
+> - Scalability requirements (users, data volume, growth)
+> - Accessibility requirements (WCAG level)
+> - Infrastructure constraints (where this runs, budget)
+>
+> **Technical Constraints:**
+> - Required integrations (APIs, services, databases)
+> - Technology preferences or mandates
+> - Deployment target (DevPod, Codespaces, Rackspace, etc.)
+>
+> **Out of Scope:**
+> - What this project explicitly does NOT do (prevents scope creep)
+>
+> Save the PRD to `plans/research/PLAN.md`
+>
+> After saving, run QE to validate the PRD has no gaps: acceptance criteria for every feature, no undefined terms, no conflicting requirements, testable success criteria.
+
+After the PRD is generated:
+
+```bash
+mkdir -p plans/research
+# PRD is saved to plans/research/PLAN.md by the agent
+aqe-generate           # Validate PRD completeness
+aqe-gate               # QE gate — PRD must pass before planning
+bd add --type decision "PRD complete — plans/research/PLAN.md — QE passed"
+gnx-analyze            # Index the new docs
+```
+
+### 0.5.2 — PRD from Existing Research
+
+If you already have research, notes, or a rough spec, put them in `plans/research/` and then:
+
+> Review all files in `/plans/research/` and synthesize them into a single comprehensive PRD. Resolve any conflicts between sources. Identify gaps where requirements are undefined or ambiguous. Save the consolidated PRD to `plans/research/PLAN.md`.
+>
+> Run QE to validate completeness — every feature needs acceptance criteria, every requirement needs to be testable.
+
+### 0.5.3 — PRD for an Existing Codebase
+
+If you're adding a major feature to an existing project:
+
+> Analyze the current codebase using GitNexus (`gnx-analyze`). Review the existing architecture, bounded contexts, and ADRs. Then generate a PRD for [new feature/system] that integrates with what already exists.
+>
+> The PRD must reference: existing bounded contexts it touches, existing ADRs it depends on or extends, blast-radius analysis for the changes, and migration path if existing behavior changes.
+>
+> Save to `plans/research/PLAN.md`. Run QE to validate.
+
+---
+
 ## Phase 1: Plan (ADR/DDD)
 
 ### 1.1 — Research-Driven ADR/DDD Planning
 
-This is the core planning prompt. It reads your research, creates the full architecture plan, and uses every Ruflo intelligence feature — but does NOT implement.
+This is the core planning prompt. It reads your PRD from `plans/research/PLAN.md`, creates the full architecture plan, and uses every Ruflo intelligence feature — but does NOT implement.
 
 > Review the `/plans/research` and create a detailed ADR/DDD implementation using all the various capabilities of Ruflo self-learning, security, hooks, and other optimizations. Spawn swarm, do not implement yet.
 >
@@ -491,8 +561,9 @@ After Phase 1 planning, replace the generic CLAUDE.md with this structure:
 | What you want to do | Prompt / Command |
 |---------------------|-----------------|
 | Start a session | `bd-ready && gnx-status && turbo-status` |
-| Plan from research | "Review `/plans/research` and create detailed ADR/DDD... do not implement yet" |
-| Customize environment | "Update CLAUDE.md to match the DDD" + "Update statusline" |
+| Generate PRD | "Generate a comprehensive PRD... save to `plans/research/PLAN.md`" + `aqe-gate` |
+| Plan from PRD | "Review `/plans/research` and create detailed ADR/DDD... do not implement yet" + `aqe-gate` per ADR |
+| Customize environment | "Update CLAUDE.md to match the DDD" + "Update statusline" + `aqe-gate` |
 | Implement everything | "Spawn swarm, implement completely, test, validate, benchmark, optimize, document, continue until complete" |
 | Implement one context | "Implement [context] only" + `wt-add` + `aqe-gate` |
 | Implement in parallel | `wt-add` × N + `rf-swarm` |
