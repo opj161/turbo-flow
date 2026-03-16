@@ -1,33 +1,85 @@
 # Turbo Flow v4 + Ruflo v3.5 — Quick Reference
 
+> Commands use TurboFlow aliases. If aliases aren't set up, use native commands shown in parentheses.
+
+### Alias → Native Command Map
+
+| Alias | Native Command |
+|-------|---------------|
+| `rf-wizard` | `npx ruflo@latest init --wizard` |
+| `rf-swarm` | `npx ruflo@latest swarm init --topology hierarchical` |
+| `rf-mesh` | `npx ruflo@latest swarm init --topology mesh` |
+| `rf-ring` | `npx ruflo@latest swarm init --topology ring` |
+| `rf-star` | `npx ruflo@latest swarm init --topology star` |
+| `rf-spawn [type]` | `npx ruflo@latest agent spawn -t [type]` |
+| `rf-daemon` | `npx ruflo@latest daemon start` |
+| `rf-status` | `npx ruflo@latest status` |
+| `rf-doctor` | `npx ruflo@latest doctor --fix` |
+| `rf-init` | `npx ruflo@latest init` |
+| `rf-plugins` | `npx ruflo@latest plugins list --installed` |
+| `ruv-remember K V` | `npx ruflo@latest memory store --key "K" --value "V"` |
+| `ruv-recall Q` | `npx ruflo@latest memory search --query "Q"` |
+| `mem-search Q` | `npx ruflo@latest memory search --query "Q"` |
+| `mem-stats` | `npx ruflo@latest memory stats` |
+| `bd-ready` | `bd ready --json` |
+| `bd-add` | `bd create "Title" -t task -p N` |
+| `bd-list` | `bd list` |
+| `wt-add NAME` | `git worktree add .worktrees/NAME -b NAME-$(date +%s)` |
+| `wt-remove NAME` | `git worktree remove .worktrees/NAME` |
+| `wt-list` | `git worktree list` |
+| `wt-clean` | `git worktree prune` |
+| `gnx-analyze` | `npx gitnexus analyze` |
+| `gnx-serve` | `npx gitnexus serve` |
+| `gnx-wiki` | `npx gitnexus wiki` |
+| `aqe-generate` | `npx @agentic-qe/v3 generate` (or via MCP) |
+| `aqe-gate` | `npx @agentic-qe/v3 gate` (or via MCP) |
+| `os-init` | `openspec init` |
+| `hooks-train` | `npx ruflo@latest hooks pretrain` |
+| `hooks-route` | `npx ruflo@latest hooks route --task "..."` |
+| `neural-train` | `npx ruflo@latest neural train` |
+| `neural-patterns` | `npx ruflo@latest neural patterns` |
+| `turbo-status` | TF-specific statusline check |
+| `turbo-help` | TF-specific help display |
+
 ---
 
 ## Boot (every session)
 
 ```bash
+# Using TF aliases:
 source ~/.bashrc
-bd ready --json          # Load project state
-gnx-analyze              # Refresh knowledge graph
-turbo-status             # Full stack health check
+bd ready --json          # (native: bd ready --json)
+gnx-analyze              # (native: npx gitnexus analyze)
+turbo-status             # (TF-specific)
+
+# Using native commands only:
+source ~/.bashrc
+bd ready --json
+npx gitnexus analyze
+npx ruflo@latest doctor --fix
+npx ruflo@latest hooks pretrain
+npx ruflo@latest daemon start
 ```
 
-One-liner: `source ~/.bashrc && rf-doctor && bd ready --json && gnx-analyze && hooks-train && rf-daemon && turbo-status`
+One-liner (aliases): `source ~/.bashrc && rf-doctor && bd ready --json && gnx-analyze && hooks-train && rf-daemon && turbo-status`
+
+One-liner (native): `source ~/.bashrc && npx ruflo@latest doctor --fix && bd ready --json && npx gitnexus analyze && npx ruflo@latest hooks pretrain && npx ruflo@latest daemon start`
 
 ---
 
 ## The Core Loop
 
 ```
-BOOT:       source ~/.bashrc → rf-doctor → bd ready → gnx-analyze → hooks-train → turbo-status
-PRD:        generate PRD → save to plans/research/PLAN.md → aqe-gate
+BOOT:       source ~/.bashrc → rf-doctor (npx ruflo doctor --fix) → bd ready → gnx-analyze (npx gitnexus analyze) → hooks-train (npx ruflo hooks pretrain) → turbo-status
+PRD:        generate PRD → save to plans/research/PLAN.md → aqe-gate (npx @agentic-qe/v3 gate)
 PLAN:       review /plans/research → create ADR/DDD → aqe-gate per ADR
 CUSTOMIZE:  update CLAUDE.md → update statusline → hooks-train → gnx-analyze → aqe-gate
-EXECUTE:    rf-swarm → agents in worktrees → aqe-gate per context → aqe-gate full codebase
-FEATURE:    bd ready → blast radius → wt-add → implement → aqe-gate → merge → gnx-analyze
+EXECUTE:    rf-swarm (npx ruflo swarm init) → agents in worktrees → aqe-gate per context → aqe-gate full codebase
+FEATURE:    bd ready → blast radius → wt-add (git worktree add) → implement → aqe-gate → merge → gnx-analyze
 REFACTOR:   characterization tests → wt-add → refactor → aqe-gate → merge → gnx-analyze
 BUGFIX:     wt-add → failing test → fix → aqe-gate → merge → gnx-analyze
 RELEASE:    full aqe-gate → security scan → changelog from bd list → git tag
-HANDOFF:    bd create (remaining work) → bd close (done items) → gnx-analyze → neural-patterns
+HANDOFF:    bd create (remaining work) → bd close (done items) → gnx-analyze → neural-patterns (npx ruflo neural patterns)
 ```
 
 ---
@@ -36,28 +88,28 @@ HANDOFF:    bd create (remaining work) → bd close (done items) → gnx-analyze
 
 ### Ruflo Orchestration
 
-| Alias | What it does |
-|-------|-------------|
-| `rf-wizard` | Interactive project setup |
-| `rf-swarm` | Hierarchical swarm (8 agents max) |
-| `rf-mesh` | Mesh swarm (all-to-all) |
-| `rf-ring` | Ring swarm (sequential pipeline) |
-| `rf-star` | Star swarm (hub-and-spoke) |
-| `rf-spawn coder` | Spawn a typed agent |
-| `rf-daemon` | Start background workers |
-| `rf-status` | Ruflo status |
-| `rf-doctor` | Health check + auto-fix |
-| `rf-init` | Initialize Ruflo |
-| `rf-plugins` | List installed plugins |
+| Alias | Native Command | What it does |
+|-------|---------------|-------------|
+| `rf-wizard` | `npx ruflo@latest init --wizard` | Interactive project setup |
+| `rf-swarm` | `npx ruflo@latest swarm init --topology hierarchical` | Hierarchical swarm (8 agents max) |
+| `rf-mesh` | `npx ruflo@latest swarm init --topology mesh` | Mesh swarm (all-to-all) |
+| `rf-ring` | `npx ruflo@latest swarm init --topology ring` | Ring swarm (sequential pipeline) |
+| `rf-star` | `npx ruflo@latest swarm init --topology star` | Star swarm (hub-and-spoke) |
+| `rf-spawn coder` | `npx ruflo@latest agent spawn -t coder` | Spawn a typed agent |
+| `rf-daemon` | `npx ruflo@latest daemon start` | Start background workers |
+| `rf-status` | `npx ruflo@latest status` | Ruflo status |
+| `rf-doctor` | `npx ruflo@latest doctor --fix` | Health check + auto-fix |
+| `rf-init` | `npx ruflo@latest init` | Initialize Ruflo |
+| `rf-plugins` | `npx ruflo@latest plugins list --installed` | List installed plugins |
 
 ### Memory
 
-| Alias | What it does |
-|-------|-------------|
-| `ruv-remember KEY VALUE` | Store in AgentDB |
-| `ruv-recall QUERY` | Query AgentDB |
-| `mem-search QUERY` | Search all memory tiers |
-| `mem-stats` | Memory statistics |
+| Alias | Native Command | What it does |
+|-------|---------------|-------------|
+| `ruv-remember KEY VALUE` | `npx ruflo@latest memory store --key "KEY" --value "VALUE"` | Store in AgentDB |
+| `ruv-recall QUERY` | `npx ruflo@latest memory search --query "QUERY"` | Query AgentDB |
+| `mem-search QUERY` | `npx ruflo@latest memory search --query "QUERY"` | Search all memory tiers |
+| `mem-stats` | `npx ruflo@latest memory stats` | Memory statistics |
 
 ### Beads (Task Tracker)
 
