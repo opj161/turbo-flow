@@ -330,25 +330,69 @@ ok "Elapsed: $(elapsed)"
 # =============================================================================
 # STEP 6: Beads — Cross-Session Project Memory (NEW in 4.0)
 # Agents remember across sessions via git-native JSONL.
+# Repo: https://github.com/steveyegge/beads
+# Install: go install github.com/steveyegge/beads/cmd/bd@latest
 # FIX: Same OOM protection as GitNexus — subshell + capped heap.
 # =============================================================================
 step 6 "Beads (Cross-Session Memory)"
 
 if ! command -v bd &>/dev/null; then
     BD_OK=0
-    (
-        export NODE_OPTIONS="--max-old-space-size=512"
-        npm install -g beads-cli >> "$LOG" 2>&1
-    ) && BD_OK=1 || true
 
-    if [ "$BD_OK" -eq 1 ] && command -v bd &>/dev/null; then
-        ok "Beads installed"
-    else
-        # Try pip as lighter-weight fallback
-        if pip install --user beads >> "$LOG" 2>&1 && command -v bd &>/dev/null; then
-            ok "Beads installed (pip)"
+    # First try Go install (primary method from steveyegge/beads repo)
+    if command -v go &>/dev/null; then
+        (
+            export NODE_OPTIONS="--max-old-space-size=512"
+            go install github.com/steveyegge/beads/cmd/bd@latest >> "$LOG" 2>&1
+        ) && BD_OK=1 || true
+
+        if [ "$BD_OK" -eq 1 ] && command -v bd &>/dev/null; then
+            ok "Beads installed via Go"
+        fi
+    fi
+
+    # Fallback: Try npm package if Go install failed or Go not available
+    # Note: npm package name is @beads/bd, NOT beads-cli
+    if [ "$BD_OK" -eq 0 ]; then
+        (
+            export NODE_OPTIONS="--max-old-space-size=512"
+            npm install -g @beads/bd >> "$LOG" 2>&1
+        ) && BD_OK=1 || true
+
+        if [ "$BD_OK" -eq 1 ] && command -v bd &>/dev/null; then
+            ok "Beads installed via npm"
+        fi
+    fi
+
+    # Final fallback: Download binary from GitHub releases
+    if [ "$BD_OK" -eq 0 ]; then
+        BD_VERSION="v1.0.8"
+        BD_ARCH=$(uname -m)
+        BD_OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+
+        case "$BD_ARCH" in
+            x86_64|amd64) BD_ARCH="amd64" ;;
+            arm64|aarch64) BD_ARCH="arm64" ;;
+            *) BD_ARCH="amd64" ;;  # fallback
+        esac
+
+        case "$BD_OS" in
+            darwin) BD_OS="darwin" ;;
+            linux) BD_OS="linux" ;;
+            *) BD_OS="linux" ;;  # fallback
+        esac
+
+        BD_URL="https://github.com/steveyegge/beads/releases/download/${BD_VERSION}/bd-${BD_OS}-${BD_ARCH}.tar.gz"
+
+        (
+            curl -fsSL "$BD_URL" | tar -xzf - -C "$HOME/.local/bin" >> "$LOG" 2>&1
+            chmod +x "$HOME/.local/bin/bd" 2>/dev/null
+        ) && BD_OK=1 || true
+
+        if [ "$BD_OK" -eq 1 ] && command -v bd &>/dev/null; then
+            ok "Beads installed via binary download"
         else
-            warn "Beads install deferred to post-setup bootstrap (memory-constrained)"
+            warn "Beads install deferred to post-setup bootstrap"
             NEEDS_BOOTSTRAP=1
         fi
     fi
@@ -647,20 +691,17 @@ alias rf-plugins='npx ruflo@latest plugins list'
 rf-spawn() { npx ruflo@latest agent spawn -t "${1:-coder}" --name "${2:-agent-$RANDOM}"; }
 rf-task() { npx ruflo@latest swarm "$1" --parallel; }
 
-# --- RuVector / AgentDB (accessed through ruflo) ---
-alias ruv='npx ruflo@latest agentdb'
-alias ruv-stats='npx ruflo@latest agentdb stats'
-alias ruv-init='npx ruflo@latest agentdb init'
-ruv-remember() { npx ruflo@latest agentdb store --key "$1" --value "$2"; }
-ruv-recall() { npx ruflo@latest agentdb query "$1"; }
-
 # --- Memory (ruflo native) ---
+# Use 'ruflo memory' for persistent storage (replaces agentdb)
+alias mem='npx ruflo@latest memory'
 alias mem-search='npx ruflo@latest memory search'
 alias mem-store='npx ruflo@latest memory store'
 alias mem-stats='npx ruflo@latest memory stats'
+mem-remember() { npx ruflo@latest memory store --key "$1" --value "$2"; }
+mem-recall() { npx ruflo@latest memory search "$1"; }
 
 # --- Beads (cross-session memory) ---
-alias bd='bd'
+# Note: 'bd' is installed directly, no alias needed
 alias bd-ready='bd ready'
 alias bd-add='bd add'
 alias bd-list='bd list'
@@ -696,10 +737,24 @@ alias gnx-wiki='npx gitnexus wiki'
 alias gnx-list='npx gitnexus list'
 alias gnx-clean='npx gitnexus clean'
 
-# --- Agentic QE (via ruflo plugin) ---
-alias aqe='npx ruflo@latest plugins run agentic-qe'
-alias aqe-generate='npx ruflo@latest plugins run agentic-qe generate'
-alias aqe-gate='npx ruflo@latest plugins run agentic-qe gate'
+# --- Agentic QE (via ruflo MCP tools) ---
+# Access 58 QE agents through MCP tool calls, not 'plugins run'
+# Examples:
+#   npx ruflo@latest mcp call aqe/generate-tests --targetPath ./src --testType unit
+#   npx ruflo@latest mcp call aqe/security-scan --targetPath ./src --scanType sast
+#   npx ruflo@latest mcp call aqe/evaluate-quality-gate
+aqe() {
+    echo "Agentic QE is accessed via MCP tools. Examples:"
+    echo "  npx ruflo@latest mcp call aqe/generate-tests --targetPath ./src"
+    echo "  npx ruflo@latest mcp call aqe/security-scan --targetPath ./src"
+    echo "  npx ruflo@latest mcp call aqe/predict-defects --targetPath ./src"
+}
+aqe-generate() {
+    npx ruflo@latest mcp call aqe/generate-tests "$@"
+}
+aqe-gate() {
+    npx ruflo@latest mcp call aqe/evaluate-quality-gate "$@"
+}
 
 # --- OpenSpec (spec-driven development) ---
 alias os='npx @fission-ai/openspec'
@@ -730,7 +785,7 @@ turbo-status() {
     npx ruflo@latest --version 2>/dev/null && echo "  ✓ Ruflo" || echo "  ✗ Ruflo"
     echo ""
     echo "Memory:"
-    bd --version 2>/dev/null && echo "  ✓ Beads" || echo "  ✗ Beads (install: npm i -g beads-cli)"
+    bd --version 2>/dev/null && echo "  ✓ Beads" || echo "  ✗ Beads (install: go install github.com/steveyegge/beads/cmd/bd@latest)"
     echo "  Agent Teams: ${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-off}"
     echo ""
     echo "Plugins:"
@@ -762,9 +817,9 @@ turbo-help() {
     echo "Memory:"
     echo "  bd-ready           Check project state (session start)"
     echo "  bd-add             Record issue/decision/blocker"
-    echo "  ruv-remember K V   Store in AgentDB"
-    echo "  ruv-recall Q       Query AgentDB"
+    echo "  mem-store K V      Store in ruflo memory"
     echo "  mem-search Q       Search ruflo memory"
+    echo "  mem-stats          View memory statistics"
     echo ""
     echo "Isolation:"
     echo "  wt-add agent-1     Create worktree for agent"
