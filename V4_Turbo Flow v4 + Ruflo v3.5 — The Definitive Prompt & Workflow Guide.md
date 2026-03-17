@@ -556,7 +556,7 @@ Each stage passes its output to the next. Store intermediate results in Beads.
 > **Note on MCP tool names:** The prefix depends on how you registered the MCP server. If you ran `claude mcp add ruflo ...` the prefix is `mcp__ruflo__`. If you registered as `claude-flow`, use `mcp__claude-flow__`. The tool names after the prefix are the same either way. Check with `claude mcp list` to verify your registration.
 
 ```
-mcp__ruflo__swarm_init { topology: "hierarchical", maxAgents: 12, strategy: "adaptive" }
+mcp__ruflo__swarm_init { topology: "hierarchical", config: { maxAgents: 12 } }
 mcp__ruflo__agent_spawn { type: "coordinator", capabilities: ["planning", "delegation"] }
 mcp__ruflo__agent_spawn { type: "coder", capabilities: ["typescript", "react", "testing"] }
 mcp__ruflo__agent_spawn { type: "architect", capabilities: ["system-design", "api-contracts"] }
@@ -619,11 +619,13 @@ Spawn a TDD swarm: specification agent, test-writer agent, coder agent, reviewer
 
 ### MCP SPARC Invocations
 
+> SPARC modes are auto-activated Claude Code skills. Just describe what you want (e.g. "implement with TDD") and the appropriate SPARC skill activates. For explicit invocation, use the `/sparc` skill prefix or the Skill tool in Claude Code.
+
 ```
-mcp__ruflo__sparc_mode { mode: "orchestrator", task_description: "coordinate feature development", options: { parallel: true, monitor: true } }
-mcp__ruflo__sparc_mode { mode: "coder", task_description: "implement user authentication with JWT", options: { test_driven: true, parallel_edits: true } }
-mcp__ruflo__sparc_mode { mode: "architect", task_description: "design scalable e-commerce platform", options: { detailed: true, memory_enabled: true, patterns: ["microservices", "event-driven"] } }
-mcp__ruflo__sparc_mode { mode: "tdd", task_description: "implement feature X with 90% coverage", options: { coverage_target: 90, test_framework: "jest" } }
+# SPARC is invoked as a skill, not an MCP tool. Example prompts:
+# "Implement this feature using the SPARC TDD methodology"
+# "Run SPARC architecture analysis on this codebase"
+# Use /sparc:tdd, /sparc:architect, /sparc:reviewer, etc. for explicit invocation
 ```
 
 ---
@@ -1070,8 +1072,8 @@ mcp__ruflo__browser_fill { ref: "@e1", value: "user@example.com" }
 mcp__ruflo__browser_type { ref: "@e2", text: "password" }
 mcp__ruflo__browser_navigate { url: "https://..." }
 mcp__ruflo__browser_execute_js { script: "document.title" }
-mcp__ruflo__browser_start_trajectory { goal: "Complete checkout flow" }
-mcp__ruflo__browser_end_trajectory { success: true, verdict: "Checkout succeeded" }
+# Browser automation is fully supported via the 59 browser MCP tools above
+# (open, snapshot, click, fill, type, select, scroll, navigate, etc.)
 ```
 
 ---
@@ -1725,7 +1727,7 @@ rf-plugins                                                    # List all install
 npx ruflo@latest plugins install -n @claude-flow/plugin-agentic-qe     # Install a plugin
 npx ruflo@latest plugins install -n @claude-flow/plugin-gastown-bridge  # Install Gastown
 npx ruflo@latest plugins install -n @claude-flow/teammate-plugin        # Install Teammate
-npx ruflo@latest plugins list --installed                               # List installed
+npx ruflo@latest plugins list                                             # List installed
 ```
 
 ### Prompt: Hive Mind / Advanced Swarm
@@ -2047,7 +2049,7 @@ HANDOFF:    bd create (remaining work) → bd close (done items) → gnx-analyze
 | `rf-status` | `npx ruflo@latest status` |
 | `rf-doctor` | `npx ruflo@latest doctor --fix` |
 | `rf-init` | `npx ruflo@latest init` |
-| `rf-plugins` | `npx ruflo@latest plugins list --installed` |
+| `rf-plugins` | `npx ruflo@latest plugins list` |
 | **Memory** | |
 | `mem-store KEY VALUE` | `npx ruflo@latest memory store --key "KEY" --value "VALUE"` |
 | `mem-search QUERY` | `npx ruflo@latest memory search --query "QUERY"` |
@@ -2066,8 +2068,8 @@ HANDOFF:    bd create (remaining work) → bd close (done items) → gnx-analyze
 | `gnx-serve` | `npx gitnexus serve` |
 | `gnx-wiki` | `npx gitnexus wiki` |
 | **Quality** | |
-| `aqe-generate` | `npx ruflo@latest mcp call aqe/generate-tests` |
-| `aqe-gate` | `npx ruflo@latest mcp call aqe/evaluate-quality-gate` |
+| `aqe-generate` | `npx @agentic-qe/v3 generate` |
+| `aqe-gate` | `npx @agentic-qe/v3 gate` |
 | **OpenSpec** | |
 | `os-init` | `openspec init` |
 | `os` | `openspec` |
@@ -2086,23 +2088,21 @@ HANDOFF:    bd create (remaining work) → bd close (done items) → gnx-analyze
 
 ```
 # Swarm
-mcp__ruflo__swarm_init { topology: "hierarchical|mesh|ring|star", maxAgents: N, strategy: "adaptive" }
-mcp__ruflo__agent_spawn { type: "coder|architect|tester|researcher|security|documenter|coordinator", capabilities: [...] }
+mcp__ruflo__swarm_init { topology: "hierarchical|mesh|ring|star" }
+mcp__ruflo__agent_spawn { agentType: "coder|architect|tester|researcher|security|documenter|coordinator" }
 
-# SPARC
-mcp__ruflo__sparc_mode { mode: "orchestrator|coder|architect|tdd|researcher|reviewer|optimizer|devops|security|documenter", task_description: "...", options: {...} }
+# SPARC (invoked as Claude Code skills, not MCP tools)
+# Use /sparc:tdd, /sparc:architect, /sparc:reviewer, etc.
 
 # Memory
 mcp__ruflo__memory_store { key: "...", value: "...", namespace: "..." }
 mcp__ruflo__memory_search { query: "...", limit: N }
 
 # Browser
-mcp__ruflo__browser_open { url: "...", enableSecurity: true }
+mcp__ruflo__browser_open { url: "..." }
 mcp__ruflo__browser_snapshot { interactive: true }
-mcp__ruflo__browser_click { ref: "@eN" }
-mcp__ruflo__browser_fill { ref: "@eN", value: "..." }
-mcp__ruflo__browser_start_trajectory { goal: "..." }
-mcp__ruflo__browser_end_trajectory { success: true, verdict: "..." }
+mcp__ruflo__browser_click { target: "@eN" }
+mcp__ruflo__browser_fill { target: "@eN", value: "..." }
 ```
 
 ### Component Summary
