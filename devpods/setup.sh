@@ -15,6 +15,8 @@
 #   FIX 8: bd init / gitnexus analyze in subshells with || true
 #   FIX 9: sed -i compatibility (GNU vs BSD) handled
 #   FIX 10: MCP registration section fully guarded
+#   FIX 11: Removed --wizard flag from ruflo init (caused hang on non-TTY/stdin)
+#   FIX 12: Added timeout 30 to claude mcp add to prevent auth-prompt hang
 #
 # What changed from v3.4.1:
 #   REMOVED: claude-flow@alpha (dead package → now ruflo)
@@ -139,13 +141,14 @@ else
     ok "Claude Code $(claude --version 2>/dev/null | head -1 || echo 'present')"
 fi
 
-# ── FIX 1: Ruflo init — handle "already initialized" without crashing ──
+# ── FIX 1 + FIX 11: Ruflo init — handle "already initialized" without crashing ──
 # npx ruflo@latest init returns non-zero when already initialized.
 # With set -e, this killed the entire script. Now we check the exit code
 # and treat "already initialized" as success.
+# --wizard flag removed: caused indefinite hang on non-TTY/no-stdin environments.
 RUFLO_INIT_OUTPUT=""
 RUFLO_INIT_RC=0
-RUFLO_INIT_OUTPUT=$(npx ruflo@latest init --wizard 2>&1) || RUFLO_INIT_RC=$?
+RUFLO_INIT_OUTPUT=$(npx ruflo@latest init 2>&1) || RUFLO_INIT_RC=$?
 
 if [ $RUFLO_INIT_RC -eq 0 ]; then
     ok "Ruflo v3.5 initialized (includes RuVector, AgentDB, SONA, skills, browser, observability)"
@@ -166,11 +169,10 @@ else
     fi
 fi
 
-# ── FIX 2: MCP registration — fully guarded ──
-# claude mcp commands can fail for many reasons (no auth, no config dir, etc.)
-# None of these should abort the script.
+# ── FIX 2 + FIX 12: MCP registration — fully guarded, timeout added to prevent
+# auth-prompt hang on claude mcp add ──
 claude mcp remove claude-flow 2>/dev/null || true
-claude mcp add ruflo -- npx -y ruflo@latest 2>/dev/null \
+timeout 30 claude mcp add ruflo -- npx -y ruflo@latest 2>/dev/null \
     && ok "Ruflo MCP server registered" \
     || warn "Ruflo MCP registration skipped (configure manually if needed)"
 
@@ -891,13 +893,13 @@ done
 source "$ALIAS_FILE" 2>/dev/null || true
 ok "Aliases written to $ALIAS_FILE and sourced"
 
-# ── FIX 10: MCP Registration — all commands fully guarded ──
+# ── FIX 10 + FIX 12: MCP Registration — all commands fully guarded, timeout added ──
 
 # GitNexus MCP
 if npx gitnexus setup >> "$LOG" 2>&1; then
     ok "GitNexus MCP registered"
 else
-    if claude mcp add gitnexus -- npx -y gitnexus mcp >> "$LOG" 2>&1; then
+    if timeout 30 claude mcp add gitnexus -- npx -y gitnexus mcp >> "$LOG" 2>&1; then
         ok "GitNexus MCP registered manually"
     else
         warn "GitNexus MCP registration failed (run: npx gitnexus setup)"
