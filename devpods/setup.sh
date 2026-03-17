@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
 # TurboFlow 4.0 Setup Script (FIXED)
 # Replaces: .devcontainer/setup.sh from v3.4.1
@@ -975,13 +975,13 @@ fi
 if ! command -v dolt &>/dev/null; then
     echo "[\$(date)] Installing Dolt (Beads database backend)..." >> "\$BSLOG"
     (
-        DOLT_ARCH=$(uname -m)
-        case "$DOLT_ARCH" in
+        DOLT_ARCH=\$(uname -m)
+        case "\$DOLT_ARCH" in
             x86_64|amd64) DOLT_ARCH="amd64" ;;
             aarch64|arm64) DOLT_ARCH="arm64" ;;
             *) DOLT_ARCH="amd64" ;;
         esac
-        curl -L "https://github.com/dolthub/dolt/releases/latest/download/dolt-linux-${DOLT_ARCH}.tar.gz" \
+        curl -L "https://github.com/dolthub/dolt/releases/latest/download/dolt-linux-\${DOLT_ARCH}.tar.gz" \
             -o /tmp/dolt.tar.gz 2>/dev/null
         sudo tar -xzf /tmp/dolt.tar.gz -C /usr/local/bin/ 2>/dev/null
         if [ -d "/usr/local/bin/dolt/bin" ]; then
@@ -1095,3 +1095,4 @@ echo -e "    • 4 separate core installs → ${GREEN}1 ruflo init${NC}"
 echo ""
 echo -e "  ${BOLD}Logs:${NC} setup=$LOG  bootstrap=$BOOTSTRAP_LOG"
 echo ""
+exit 0
