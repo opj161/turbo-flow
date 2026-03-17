@@ -341,32 +341,34 @@ step 6 "Beads (Cross-Session Memory)"
 
 # 6a: Install Dolt (Beads database backend) if not present
 if ! command -v dolt &>/dev/null; then
+    DOLT_OK=0
+    # Method 1: official dolthub install script (most reliable)
     (
-        DOLT_ARCH=$(uname -m)
-        case "$DOLT_ARCH" in
-            x86_64|amd64) DOLT_ARCH="amd64" ;;
-            aarch64|arm64) DOLT_ARCH="arm64" ;;
-            *) DOLT_ARCH="amd64" ;;
-        esac
-        curl -L "https://github.com/dolthub/dolt/releases/latest/download/dolt-linux-${DOLT_ARCH}.tar.gz" \
-            -o /tmp/dolt.tar.gz 2>/dev/null
-        sudo tar -xzf /tmp/dolt.tar.gz -C /usr/local/bin/ 2>/dev/null
-        # The tar extracts to a directory structure — find and move the actual binary
-        if [ -d "/usr/local/bin/dolt/bin" ]; then
-            sudo cp /usr/local/bin/dolt/bin/dolt /usr/local/bin/dolt-bin 2>/dev/null
-            sudo rm -rf /usr/local/bin/dolt 2>/dev/null
-            sudo mv /usr/local/bin/dolt-bin /usr/local/bin/dolt 2>/dev/null
-        fi
-        sudo chmod +x /usr/local/bin/dolt 2>/dev/null
-        rm -f /tmp/dolt.tar.gz
-    ) || true
+        curl -fsSL https://github.com/dolthub/dolt/releases/latest/download/install.sh             | sudo bash >> "$LOG" 2>&1
+    ) && DOLT_OK=1 || true
+    # Method 2: direct binary download fallback
+    if [ "$DOLT_OK" -eq 0 ] || ! command -v dolt &>/dev/null; then
+        DOLT_OK=0
+        (
+            DOLT_ARCH=$(uname -m)
+            case "$DOLT_ARCH" in
+                x86_64|amd64) DOLT_ARCH="amd64" ;;
+                aarch64|arm64) DOLT_ARCH="arm64" ;;
+                *) DOLT_ARCH="amd64" ;;
+            esac
+            DOLT_URL="https://github.com/dolthub/dolt/releases/latest/download/dolt-linux-${DOLT_ARCH}"
+            curl -fsSL "$DOLT_URL" -o /tmp/dolt-bin 2>/dev/null
+            chmod +x /tmp/dolt-bin
+            sudo mv /tmp/dolt-bin /usr/local/bin/dolt
+        ) && DOLT_OK=1 || true
+    fi
     if command -v dolt &>/dev/null; then
-        ok "Dolt $(dolt version 2>/dev/null) installed (Beads database backend)"
+        ok "Dolt $(dolt version 2>/dev/null | head -1) installed (Beads database backend)"
     else
         warn "Dolt not installed — Beads requires Dolt. Install manually from https://docs.dolthub.com"
     fi
 else
-    ok "Dolt $(dolt version 2>/dev/null) already present"
+    ok "Dolt $(dolt version 2>/dev/null | head -1) already present"
 fi
 
 if ! command -v bd &>/dev/null; then
@@ -451,9 +453,15 @@ for dir in src tests docs scripts config plans; do
 done
 ok "Workspace directories created"
 
-# Enable Native Agent Teams (Anthropic experimental)
+# Enable Native Agent Teams (Anthropic experimental) — export for current session
+# AND persist to shell rc files so it survives container restarts
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
-ok "Agent Teams enabled (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1)"
+for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+    if [ -f "$rc" ]; then
+        grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' "$rc" 2>/dev/null ||             echo 'export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1' >> "$rc"
+    fi
+done
+ok "Agent Teams enabled and persisted to shell rc (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1)"
 
 ok "Elapsed: $(elapsed)"
 
@@ -895,16 +903,14 @@ ok "Aliases written to $ALIAS_FILE and sourced"
 
 # ── FIX 10 + FIX 12: MCP Registration — all commands fully guarded, timeout added ──
 
-# GitNexus MCP
-if npx gitnexus setup >> "$LOG" 2>&1; then
-    ok "GitNexus MCP registered"
-else
-    if timeout 30 claude mcp add gitnexus -- npx -y gitnexus mcp >> "$LOG" 2>&1; then
-        ok "GitNexus MCP registered manually"
-    else
-        warn "GitNexus MCP registration failed (run: npx gitnexus setup)"
-    fi
-fi
+# GitNexus MCP — register at both user level and project level
+# Run npx gitnexus setup first (project scope), then force user-level registration
+npx gitnexus setup >> "$LOG" 2>&1 || true
+# Force user-level registration so it persists across workspaces
+timeout 30 claude mcp add gitnexus --scope user -- npx -y gitnexus mcp >> "$LOG" 2>&1     && ok "GitNexus MCP registered (user scope)"     || {
+        # Fallback: try without --scope flag (older claude versions)
+        timeout 30 claude mcp add gitnexus -- npx -y gitnexus mcp >> "$LOG" 2>&1             && ok "GitNexus MCP registered"             || warn "GitNexus MCP registration failed (run: npx gitnexus setup)"
+    }
 
 ok "All MCP servers registered"
 
