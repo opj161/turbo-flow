@@ -7,7 +7,7 @@
 #   FIX 1: Ruflo init now handles "already initialized" gracefully (was crashing
 #          the entire script because non-zero exit + set -e)
 #   FIX 2: All claude mcp commands wrapped to never fail under set -e
-#   FIX 3: npx ruflo doctor -- removed --fix flag (interactive prompt hang), added timeout 60
+#   FIX 3: npx ruflo doctor wrapped properly
 #   FIX 4: Plugin install arithmetic fixed (PLUGINS_INSTALLED increment)
 #   FIX 5: Step numbering corrected (was two "STEP 5"s, steps 6-10 misnumbered)
 #   FIX 6: node -e for settings.json uses proper quoting
@@ -15,8 +15,6 @@
 #   FIX 8: bd init / gitnexus analyze in subshells with || true
 #   FIX 9: sed -i compatibility (GNU vs BSD) handled
 #   FIX 10: MCP registration section fully guarded
-#   FIX 11: Removed --wizard flag from ruflo init (caused hang on non-TTY/stdin)
-#   FIX 12: Added timeout 30 to claude mcp add to prevent auth-prompt hang
 #
 # What changed from v3.4.1:
 #   REMOVED: claude-flow@alpha (dead package → now ruflo)
@@ -129,7 +127,7 @@ if ! command -v claude &>/dev/null; then
         ok "Claude Code installed"
     else
         # Fallback to official installer
-        curl -fsSL https://claude.ai/install.sh 2>/dev/null | bash 2>&1 || true
+        curl -fsSL https://claude.ai/install.sh 2>/dev/null | sh 2>&1 || true
         export PATH="$HOME/.local/bin:$HOME/.claude/bin:$PATH"
         if command -v claude &>/dev/null; then
             ok "Claude Code installed via official installer"
@@ -141,14 +139,13 @@ else
     ok "Claude Code $(claude --version 2>/dev/null | head -1 || echo 'present')"
 fi
 
-# ── FIX 1 + FIX 11: Ruflo init — handle "already initialized" without crashing ──
+# ── FIX 1: Ruflo init — handle "already initialized" without crashing ──
 # npx ruflo@latest init returns non-zero when already initialized.
 # With set -e, this killed the entire script. Now we check the exit code
 # and treat "already initialized" as success.
-# --wizard flag removed: caused indefinite hang on non-TTY/no-stdin environments.
 RUFLO_INIT_OUTPUT=""
 RUFLO_INIT_RC=0
-RUFLO_INIT_OUTPUT=$(npx ruflo@latest init 2>&1) || RUFLO_INIT_RC=$?
+RUFLO_INIT_OUTPUT=$(npx ruflo@latest init --wizard 2>&1) || RUFLO_INIT_RC=$?
 
 if [ $RUFLO_INIT_RC -eq 0 ]; then
     ok "Ruflo v3.5 initialized (includes RuVector, AgentDB, SONA, skills, browser, observability)"
@@ -169,13 +166,16 @@ else
     fi
 fi
 
-# ── FIX 2 + FIX 12: MCP registration — fully guarded, timeout added to prevent
-# auth-prompt hang on claude mcp add ──
+# ── FIX 2: MCP registration — fully guarded ──
+# claude mcp commands can fail for many reasons (no auth, no config dir, etc.)
+# None of these should abort the script.
 claude mcp remove claude-flow 2>/dev/null || true
-timeout 30 claude mcp add ruflo -- npx -y ruflo@latest 2>/dev/null     && ok "Ruflo MCP server registered"     || warn "Ruflo MCP registration skipped (configure manually if needed)"
+claude mcp add ruflo -- npx -y ruflo@latest 2>/dev/null \
+    && ok "Ruflo MCP server registered" \
+    || warn "Ruflo MCP registration skipped (configure manually if needed)"
 
 # ── FIX 3: Doctor check — guarded ──
-timeout 60 npx ruflo doctor >> "$LOG" 2>&1 \
+npx ruflo doctor --fix >> "$LOG" 2>&1 \
     && ok "Ruflo doctor passed" \
     || warn "Ruflo doctor had issues (check $LOG)"
 
@@ -193,12 +193,9 @@ PLUGINS_INSTALLED=0
 
 install_plugin() {
     local plugin_name="$1"
-    # Check multiple possible install locations ruflo uses
-    local plugin_dir_workspace="$WORKSPACE/.claude-flow/plugins/$plugin_name"
-    local plugin_dir_home="$HOME/.claude-flow/plugins/$plugin_name"
-    local plugin_dir_ruflo="$HOME/.ruflo/plugins/$plugin_name"
+    local plugin_dir="$WORKSPACE/.claude-flow/plugins/$plugin_name"
 
-    if { [ -d "$plugin_dir_workspace" ] && [ -f "$plugin_dir_workspace/package.json" ]; } ||        { [ -d "$plugin_dir_home" ] && [ -f "$plugin_dir_home/package.json" ]; } ||        { [ -d "$plugin_dir_ruflo" ] && [ -f "$plugin_dir_ruflo/package.json" ]; }; then
+    if [ -d "$plugin_dir" ] && [ -f "$plugin_dir/package.json" ]; then
         ok "$plugin_name already installed"
         PLUGINS_INSTALLED=$((PLUGINS_INSTALLED + 1))
         return 0
@@ -293,97 +290,67 @@ ok "Elapsed: $(elapsed)"
 # Indexes repos into knowledge graph (dependencies, call chains, execution flows)
 # Agents get blast-radius detection before making changes
 #
-# Now running on Ubuntu 24.04 (GLIBC 2.39) — global binary works fine.
+# FIX: npm install -g gitnexus was OOM-killed (exit 137) in memory-constrained
+# DevPod containers. Now: (a) cap Node heap to 512MB, (b) run install in a
+# subshell so OOM only kills the child, (c) gc npm cache between heavy installs,
+# (d) anything that fails or is too heavy gets picked up automatically by a
+# post-setup background bootstrap — zero manual steps.
 # =============================================================================
 step 5 "GitNexus (Codebase Knowledge Graph)"
 
-# Free memory before heavy install
+# Free memory before heavy install — previous steps may have left npm caches
 npm cache clean --force >> "$LOG" 2>&1 || true
 
 # Track whether post-setup bootstrap is needed
 NEEDS_BOOTSTRAP=0
 
-# GitNexus via npx only — no global install, avoids OOM
-npx -y gitnexus --version >> "$LOG" 2>&1     && ok "GitNexus ready via npx"     || warn "GitNexus npx prefetch failed — will run on first use"
+if ! command -v gitnexus &>/dev/null; then
+    GNX_OK=0
+    (
+        export NODE_OPTIONS="--max-old-space-size=512"
+        npm install -g gitnexus >> "$LOG" 2>&1
+    ) && GNX_OK=1 || true
+
+    if [ "$GNX_OK" -eq 1 ] && command -v gitnexus &>/dev/null; then
+        ok "GitNexus installed globally"
+    else
+        warn "GitNexus install deferred to post-setup bootstrap (memory-constrained)"
+        NEEDS_BOOTSTRAP=1
+    fi
+else
+    ok "GitNexus already present"
+fi
+
+# Indexing always deferred to bootstrap (runs in background after setup exits
+# and all npm install memory is freed)
 ok "GitNexus indexing scheduled for post-setup bootstrap"
 
 ok "Elapsed: $(elapsed)"
 
 # =============================================================================
 # STEP 6: Beads — Cross-Session Project Memory (NEW in 4.0)
-# Agents remember across sessions via git-native Dolt SQL database.
-# Beads requires Dolt (https://dolthub.com) as its database backend.
-# Repo: https://github.com/steveyegge/beads
-# Install: go install github.com/steveyegge/beads/cmd/bd@latest
+# Agents remember across sessions via git-native JSONL.
 # FIX: Same OOM protection as GitNexus — subshell + capped heap.
 # =============================================================================
 step 6 "Beads (Cross-Session Memory)"
 
-# 6a: Install Dolt (Beads database backend) if not present
-if ! command -v dolt &>/dev/null; then
-    DOLT_OK=0
-    # Method 1: official dolthub install script (most reliable)
-    (
-        curl -fsSL https://github.com/dolthub/dolt/releases/latest/download/install.sh             | sudo bash >> "$LOG" 2>&1
-    ) && DOLT_OK=1 || true
-    # Method 2: direct binary download fallback
-    if [ "$DOLT_OK" -eq 0 ] || ! command -v dolt &>/dev/null; then
-        DOLT_OK=0
-        (
-            DOLT_ARCH=$(uname -m)
-            case "$DOLT_ARCH" in
-                x86_64|amd64) DOLT_ARCH="amd64" ;;
-                aarch64|arm64) DOLT_ARCH="arm64" ;;
-                *) DOLT_ARCH="amd64" ;;
-            esac
-            DOLT_URL="https://github.com/dolthub/dolt/releases/latest/download/dolt-linux-${DOLT_ARCH}"
-            curl -fsSL "$DOLT_URL" -o /tmp/dolt-bin 2>/dev/null
-            chmod +x /tmp/dolt-bin
-            sudo mv /tmp/dolt-bin /usr/local/bin/dolt
-        ) && DOLT_OK=1 || true
-    fi
-    if command -v dolt &>/dev/null; then
-        ok "Dolt $(dolt version 2>/dev/null | head -1) installed (Beads database backend)"
-    else
-        warn "Dolt not installed — Beads requires Dolt. Install manually from https://docs.dolthub.com"
-    fi
-else
-    ok "Dolt $(dolt version 2>/dev/null | head -1) already present"
-fi
-
 if ! command -v bd &>/dev/null; then
     BD_OK=0
+    (
+        export NODE_OPTIONS="--max-old-space-size=512"
+        npm install -g beads-cli >> "$LOG" 2>&1
+    ) && BD_OK=1 || true
 
-    # First try Go install (primary method from steveyegge/beads repo)
-    if command -v go &>/dev/null; then
-        (
-            export NODE_OPTIONS="--max-old-space-size=512"
-            go install github.com/steveyegge/beads/cmd/bd@latest >> "$LOG" 2>&1
-        ) && BD_OK=1 || true
-
-        if [ "$BD_OK" -eq 1 ] && command -v bd &>/dev/null; then
-            ok "Beads installed via Go"
+    if [ "$BD_OK" -eq 1 ] && command -v bd &>/dev/null; then
+        ok "Beads installed"
+    else
+        # Try pip as lighter-weight fallback
+        if pip install --user beads >> "$LOG" 2>&1 && command -v bd &>/dev/null; then
+            ok "Beads installed (pip)"
+        else
+            warn "Beads install deferred to post-setup bootstrap (memory-constrained)"
+            NEEDS_BOOTSTRAP=1
         fi
-    fi
-
-    # Fallback: Try npm package if Go install failed or Go not available
-    # Note: npm package name is @beads/bd, NOT beads-cli
-    if [ "$BD_OK" -eq 0 ]; then
-        (
-            export NODE_OPTIONS="--max-old-space-size=512"
-            npm install -g @beads/bd >> "$LOG" 2>&1
-        ) && BD_OK=1 || true
-
-        # Ensure npm global bin is on PATH so bd is found immediately
-        export PATH="$(npm bin -g 2>/dev/null):$PATH"
-        if [ "$BD_OK" -eq 1 ] && command -v bd &>/dev/null; then
-            ok "Beads installed via npm"
-        fi
-    fi
-
-    # Final fallback: try npx bd directly
-    if [ "$BD_OK" -eq 0 ]; then
-        npx -y @beads/bd --version >> "$LOG" 2>&1             && BD_OK=1 && ok "Beads available via npx"             || { warn "Beads install deferred to post-setup bootstrap"; NEEDS_BOOTSTRAP=1; }
     fi
 else
     ok "Beads already present"
@@ -407,29 +374,9 @@ for dir in src tests docs scripts config plans; do
 done
 ok "Workspace directories created"
 
-# Enable Native Agent Teams (Anthropic experimental) — export for current session
-# AND persist to shell rc files so it survives container restarts
+# Enable Native Agent Teams (Anthropic experimental)
 export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
-# Persist to interactive shells (.bashrc / .zshrc)
-for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
-    if [ -f "$rc" ]; then
-        grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' "$rc" 2>/dev/null ||             echo 'export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1' >> "$rc"
-    fi
-done
-# Also write to /etc/environment so non-interactive/non-login shells pick it up
-if [ -f /etc/environment ]; then
-    grep -q 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS' /etc/environment 2>/dev/null ||         echo 'CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1' | sudo tee -a /etc/environment >> "$LOG" 2>&1
-fi
-# Ensure npm global bin is on PATH in all shells so bd and other npm globals are found
-NPM_GLOBAL_BIN=$(npm bin -g 2>/dev/null || echo "$HOME/.npm-global/bin")
-export PATH="$NPM_GLOBAL_BIN:$PATH"
-# Persist npm global bin to interactive shells
-for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
-    if [ -f "$rc" ]; then
-        grep -q 'npm-global\|\.npm/bin' "$rc" 2>/dev/null ||             echo "export PATH="$NPM_GLOBAL_BIN:\$PATH"" >> "$rc"
-    fi
-done
-ok "Agent Teams enabled and persisted to .bashrc, .zshrc, /etc/environment"
+ok "Agent Teams enabled (CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1)"
 
 ok "Elapsed: $(elapsed)"
 
@@ -602,13 +549,13 @@ Isolation: Git worktrees per parallel agent.
 3. AgentDB context loads automatically via Ruflo
 
 ### During Work — Decision Tree
-- **Project roadmap / blockers / dependencies / decisions** → `bd create` (Beads)
+- **Project roadmap / blockers / dependencies / decisions** → `bd add` (Beads)
 - **Current session tasks / active checklist** → Native Tasks
 - **Learned patterns / routing weights / skills** → AgentDB (automatic)
 
 ### Session End
-- File any discovered work as Beads issues: `bd create "description" -t issue`
-- Summarize architectural decisions in Beads: `bd create "description" -t decision`
+- File any discovered work as Beads issues: `bd add --type issue "description"`
+- Summarize architectural decisions in Beads: `bd add --type decision "description"`
 - AgentDB persists automatically
 
 ## Isolation Rules
@@ -700,17 +647,20 @@ alias rf-plugins='npx ruflo@latest plugins list'
 rf-spawn() { npx ruflo@latest agent spawn -t "${1:-coder}" --name "${2:-agent-$RANDOM}"; }
 rf-task() { npx ruflo@latest swarm "$1" --parallel; }
 
+# --- RuVector / AgentDB (accessed through ruflo) ---
+alias ruv='npx ruflo@latest agentdb'
+alias ruv-stats='npx ruflo@latest agentdb stats'
+alias ruv-init='npx ruflo@latest agentdb init'
+ruv-remember() { npx ruflo@latest agentdb store --key "$1" --value "$2"; }
+ruv-recall() { npx ruflo@latest agentdb query "$1"; }
+
 # --- Memory (ruflo native) ---
-# Use 'ruflo memory' for persistent storage (replaces agentdb)
-alias mem='npx ruflo@latest memory'
 alias mem-search='npx ruflo@latest memory search'
 alias mem-store='npx ruflo@latest memory store'
 alias mem-stats='npx ruflo@latest memory stats'
-mem-remember() { npx ruflo@latest memory store --key "$1" --value "$2"; }
-mem-recall() { npx ruflo@latest memory search "$1"; }
 
 # --- Beads (cross-session memory) ---
-# Note: 'bd' is installed directly, no alias needed
+alias bd='bd'
 alias bd-ready='bd ready'
 alias bd-add='bd add'
 alias bd-list='bd list'
@@ -746,24 +696,10 @@ alias gnx-wiki='npx gitnexus wiki'
 alias gnx-list='npx gitnexus list'
 alias gnx-clean='npx gitnexus clean'
 
-# --- Agentic QE (via ruflo MCP tools) ---
-# Access 58 QE agents through MCP tool calls, not 'plugins run'
-# Examples:
-#   npx ruflo@latest mcp call aqe/generate-tests --targetPath ./src --testType unit
-#   npx ruflo@latest mcp call aqe/security-scan --targetPath ./src --scanType sast
-#   npx ruflo@latest mcp call aqe/evaluate-quality-gate
-aqe() {
-    echo "Agentic QE is accessed via MCP tools. Examples:"
-    echo "  npx ruflo@latest mcp call aqe/generate-tests --targetPath ./src"
-    echo "  npx ruflo@latest mcp call aqe/security-scan --targetPath ./src"
-    echo "  npx ruflo@latest mcp call aqe/predict-defects --targetPath ./src"
-}
-aqe-generate() {
-    npx ruflo@latest mcp call aqe/generate-tests "$@"
-}
-aqe-gate() {
-    npx ruflo@latest mcp call aqe/evaluate-quality-gate "$@"
-}
+# --- Agentic QE (via ruflo plugin) ---
+alias aqe='npx ruflo@latest plugins run agentic-qe'
+alias aqe-generate='npx ruflo@latest plugins run agentic-qe generate'
+alias aqe-gate='npx ruflo@latest plugins run agentic-qe gate'
 
 # --- OpenSpec (spec-driven development) ---
 alias os='npx @fission-ai/openspec'
@@ -794,7 +730,7 @@ turbo-status() {
     npx ruflo@latest --version 2>/dev/null && echo "  ✓ Ruflo" || echo "  ✗ Ruflo"
     echo ""
     echo "Memory:"
-    bd --version 2>/dev/null && echo "  ✓ Beads" || echo "  ✗ Beads (install: go install github.com/steveyegge/beads/cmd/bd@latest)"
+    bd --version 2>/dev/null && echo "  ✓ Beads" || echo "  ✗ Beads (install: npm i -g beads-cli)"
     echo "  Agent Teams: ${CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS:-off}"
     echo ""
     echo "Plugins:"
@@ -826,9 +762,9 @@ turbo-help() {
     echo "Memory:"
     echo "  bd-ready           Check project state (session start)"
     echo "  bd-add             Record issue/decision/blocker"
-    echo "  mem-store K V      Store in ruflo memory"
+    echo "  ruv-remember K V   Store in AgentDB"
+    echo "  ruv-recall Q       Query AgentDB"
     echo "  mem-search Q       Search ruflo memory"
-    echo "  mem-stats          View memory statistics"
     echo ""
     echo "Isolation:"
     echo "  wt-add agent-1     Create worktree for agent"
@@ -869,16 +805,18 @@ done
 source "$ALIAS_FILE" 2>/dev/null || true
 ok "Aliases written to $ALIAS_FILE and sourced"
 
-# ── FIX 10 + FIX 12: MCP Registration — all commands fully guarded, timeout added ──
+# ── FIX 10: MCP Registration — all commands fully guarded ──
 
-# GitNexus MCP — register at both user level and project level
-# Run npx gitnexus setup first (project scope), then force user-level registration
-npx gitnexus setup >> "$LOG" 2>&1 || true
-# Force user-level registration so it persists across workspaces
-timeout 30 claude mcp add gitnexus --scope user -- npx -y gitnexus mcp >> "$LOG" 2>&1     && ok "GitNexus MCP registered (user scope)"     || {
-        # Fallback: try without --scope flag (older claude versions)
-        timeout 30 claude mcp add gitnexus -- npx -y gitnexus mcp >> "$LOG" 2>&1             && ok "GitNexus MCP registered"             || warn "GitNexus MCP registration failed (run: npx gitnexus setup)"
-    }
+# GitNexus MCP
+if npx gitnexus setup >> "$LOG" 2>&1; then
+    ok "GitNexus MCP registered"
+else
+    if claude mcp add gitnexus -- npx -y gitnexus mcp >> "$LOG" 2>&1; then
+        ok "GitNexus MCP registered manually"
+    else
+        warn "GitNexus MCP registration failed (run: npx gitnexus setup)"
+    fi
+fi
 
 ok "All MCP servers registered"
 
@@ -939,33 +877,13 @@ echo "[\$(date)] Bootstrap starting" >> "\$BSLOG"
 # Cap all Node operations to 512MB
 export NODE_OPTIONS="--max-old-space-size=512"
 
-# --- 1. Warm GitNexus npx cache ---
-npx -y gitnexus --version >> "\$BSLOG" 2>&1 || true
-
-# --- 2. Install Dolt if missing (Beads database backend) ---
-if ! command -v dolt &>/dev/null; then
-    echo "[\$(date)] Installing Dolt (Beads database backend)..." >> "\$BSLOG"
-    (
-        DOLT_ARCH=\$(uname -m)
-        case "\$DOLT_ARCH" in
-            x86_64|amd64) DOLT_ARCH="amd64" ;;
-            aarch64|arm64) DOLT_ARCH="arm64" ;;
-            *) DOLT_ARCH="amd64" ;;
-        esac
-        curl -L "https://github.com/dolthub/dolt/releases/latest/download/dolt-linux-\${DOLT_ARCH}.tar.gz" \
-            -o /tmp/dolt.tar.gz 2>/dev/null
-        sudo tar -xzf /tmp/dolt.tar.gz -C /usr/local/bin/ 2>/dev/null
-        if [ -d "/usr/local/bin/dolt/bin" ]; then
-            sudo cp /usr/local/bin/dolt/bin/dolt /usr/local/bin/dolt-bin 2>/dev/null
-            sudo rm -rf /usr/local/bin/dolt 2>/dev/null
-            sudo mv /usr/local/bin/dolt-bin /usr/local/bin/dolt 2>/dev/null
-        fi
-        sudo chmod +x /usr/local/bin/dolt 2>/dev/null
-        rm -f /tmp/dolt.tar.gz
-    ) >> "\$BSLOG" 2>&1
+# --- 1. Retry GitNexus install if missing ---
+if ! command -v gitnexus &>/dev/null; then
+    echo "[\$(date)] Installing GitNexus..." >> "\$BSLOG"
+    npm install -g gitnexus >> "\$BSLOG" 2>&1 || true
 fi
 
-# --- 3. Retry Beads install if missing ---
+# --- 2. Retry Beads install if missing ---
 if ! command -v bd &>/dev/null; then
     echo "[\$(date)] Installing Beads..." >> "\$BSLOG"
     npm install -g beads-cli >> "\$BSLOG" 2>&1 || true
@@ -974,7 +892,7 @@ if ! command -v bd &>/dev/null; then
     pip install --user beads >> "\$BSLOG" 2>&1 || true
 fi
 
-# --- 4. Initialize Beads in workspace ---
+# --- 3. Initialize Beads in workspace ---
 if command -v bd &>/dev/null && [ -d "\$WORKSPACE/.git" ]; then
     if [ ! -d "\$WORKSPACE/.beads" ]; then
         echo "[\$(date)] Initializing Beads in workspace..." >> "\$BSLOG"
@@ -982,13 +900,19 @@ if command -v bd &>/dev/null && [ -d "\$WORKSPACE/.git" ]; then
     fi
 fi
 
-# --- 5. Index workspace with GitNexus (npx) ---
+# --- 4. Index workspace with GitNexus ---
 if [ -d "\$WORKSPACE/.git" ]; then
-    echo "[\$(date)] Indexing workspace with GitNexus..." >> "\$BSLOG"
-    (cd "\$WORKSPACE" && npx -y gitnexus analyze >> "\$BSLOG" 2>&1) || true
+    if command -v gitnexus &>/dev/null; then
+        echo "[\$(date)] Indexing workspace with GitNexus..." >> "\$BSLOG"
+        (cd "\$WORKSPACE" && gitnexus analyze >> "\$BSLOG" 2>&1) || true
+    else
+        # Fallback to npx with tight memory
+        echo "[\$(date)] Indexing workspace with GitNexus (npx)..." >> "\$BSLOG"
+        (cd "\$WORKSPACE" && npx -y gitnexus analyze >> "\$BSLOG" 2>&1) || true
+    fi
 fi
 
-# --- 6. Register GitNexus MCP if not already done ---
+# --- 5. Register GitNexus MCP if not already done ---
 if command -v gitnexus &>/dev/null || npx gitnexus --version >> "\$BSLOG" 2>&1; then
     npx gitnexus setup >> "\$BSLOG" 2>&1 \
         || claude mcp add gitnexus -- npx -y gitnexus mcp >> "\$BSLOG" 2>&1 \
@@ -1060,4 +984,3 @@ echo -e "    • 4 separate core installs → ${GREEN}1 ruflo init${NC}"
 echo ""
 echo -e "  ${BOLD}Logs:${NC} setup=$LOG  bootstrap=$BOOTSTRAP_LOG"
 echo ""
-exit 0
