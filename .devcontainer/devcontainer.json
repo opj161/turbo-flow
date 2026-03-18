@@ -33,11 +33,10 @@
                 "workbench.startupEditor": "none",
                 "terminal.integrated.profiles.linux": {
                     "tmux-workspace": {
-                        "path": "/usr/bin/env",
+                        "path": "/bin/bash",
                         "args": [
-                            "bash",
                             "-c",
-                            "tmux attach-session -t workspace 2>/dev/null || tmux new-session -s workspace 2>/dev/null || bash"
+                            "tmux attach-session -t workspace 2>/dev/null || bash"
                         ]
                     }
                 },
